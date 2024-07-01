@@ -2,14 +2,12 @@
 package ldap
 
 import (
-	"crypto/tls"
+        "crypto/tls"
 	"encoding/base64"
-	"errors"
+        "strings"
 	"fmt"
 	l "log/slog"
 	"os"
-	"path/filepath"
-
 	ld "github.com/go-ldap/ldap/v3"
 )
 
@@ -28,62 +26,26 @@ const LDAP_matching_rule_in_chain string = ":1.2.840.113556.1.4.1941:"
 func Connect() (*ld.Conn, error) {
 	host := os.Getenv("TACS_LDAP_SERVER")
 	port := os.Getenv("TACS_LDAP_PORT")
-	certificatePath := os.Getenv("TACS_LDAP_CERT")
-	certKeyPath := os.Getenv("TACS_LDAP_KEY")
+        useSSL := os.Getenv("TACS_LDAP_SSL")
+        useTLS := os.Getenv("TACS_LDAP_TLS")
 	username := os.Getenv("TACS_LDAP_USER")
 	password := os.Getenv("TACS_LDAP_PASSWORD")
 
-	conn, err := ld.DialURL(fmt.Sprintf("ldap://%s:%s", host, port))
-	if err != nil {
-		l.Error("dialing error", l.String("host", host), l.String("port", port), l.Any("err", err))
-		return nil, err
-	}
+        url := fmt.Sprintf("ldap://%s:%s", host, port)
+        if strings.ToLower(useSSL) == "true"  || port == "636" {
+                url = fmt.Sprintf("ldaps://%s:%s", host, port)
+        }
+        conn, err := ld.DialURL(url, ld.DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+        if err != nil {
+                l.Error("dialing error", l.String("host", host), l.String("port", port), l.Any("err", err))
+                return nil, err
+        }
 
-	// if SSL certificate is available - switching to encrypted communication channel
-	if certificatePath != "" && certKeyPath != "" {
-
-		cert, err := os.ReadFile(filepath.Clean(certificatePath))
-		if err != nil {
-			l.Error("ssl certificate read error",
-				l.String("ldapCertPath", certificatePath),
-				l.Any("err", err))
-
-			if cErr := conn.Close(); cErr != nil {
-				l.Error("error closing ldap connection", l.Any("err", cErr))
-				return conn, errors.Join(err, cErr)
-			}
-			return conn, err
-		}
-
-		key, err := os.ReadFile(filepath.Clean(certKeyPath))
-		if err != nil {
-			l.Error("ssl key read error", l.String("ldapKeyPath", certKeyPath), l.Any("err", err))
-
-			if cErr := conn.Close(); cErr != nil {
-				l.Error("error closing ldap connection", l.Any("err", err))
-				return conn, errors.Join(err, cErr)
-			}
-			return conn, err
-		}
-
-		// Analyzing the key-certificate mapping
-		certAndKey, err := tls.X509KeyPair(cert, key)
-		if err != nil {
-			l.Error("ssl certificate-key mapping analysis error", l.Any("err", err))
-
-			if cErr := conn.Close(); cErr != nil {
-				l.Error("error closing ldap connection", l.Any("err", err))
-				return conn, errors.Join(err, cErr)
-			}
-			return conn, err
-		}
+	if strings.ToLower(useTLS) == "true" {
 
 		// Trying to switch to TLS
-		if err := conn.StartTLS(&tls.Config{
-			MinVersion:   tls.VersionTLS12,
-			Certificates: []tls.Certificate{certAndKey},
-			ServerName:   host,
-		}); err != nil {
+		err := conn.StartTLS(&tls.Config{InsecureSkipVerify: true});
+		if err != nil {
 			l.Error("error of switching to secure channel", l.Any("err", err))
 			return conn, err
 		}
