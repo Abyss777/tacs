@@ -35,18 +35,19 @@ type (
 		// Overridden at user level. If the field is not present at the user level, it will be set to the specified value.
 		// The key is a variable declared in the template - {{ .variableName }}
 		// Value - what will be substituted for the key
-		Fields map[string]string `yaml:"fields"`
+		Fields map[string]interface{} `yaml:"fields"`
 	}
 
 	Ldap struct {
-		Uid                string       `yaml:"uid"`
-		Filter             string       `yaml:"filter"`
-		UsersSearchBase    string       `yaml:"usersSearchBase"`
-		GroupsSearchBase   string       `yaml:"groupsSearchBase"`
-		Subgroups          bool         `yaml:"subgroups"`
-		AllowWithoutGroups bool         `yaml:"allowWithoutGroups"`
-		Default            Params       `yaml:"default"`
-		List               []LdapParams `yaml:"list"`
+		Uid                string            `yaml:"uid"`
+		Filter             string            `yaml:"filter"`
+		UsersSearchBase    string            `yaml:"usersSearchBase"`
+		GroupsSearchBase   string            `yaml:"groupsSearchBase"`
+		Subgroups          bool              `yaml:"subgroups"`
+		AllowWithoutGroups bool              `yaml:"allowWithoutGroups"`
+		GroupFields        map[string]string `yaml:"groupFields"`
+		Default            Params            `yaml:"default"`
+		List               []LdapParams      `yaml:"list"`
 	}
 	LdapParams struct {
 		Group  string `yaml:"group"`
@@ -69,7 +70,7 @@ func (to Params) Merge(from Params) Params {
 	}
 
 	if to.Fields == nil {
-		to.Fields = make(map[string]string)
+		to.Fields = make(map[string]interface{})
 	}
 
 	for key := range from.Fields {
@@ -87,10 +88,10 @@ func (to Params) Merge(from Params) Params {
 func (p *Params) Values() []string {
 	var out []string = make([]string, 0)
 	for _, v := range p.Fields {
-		if strings.HasPrefix(v, "raw:") {
+		if strings.HasPrefix(v.(string), "raw:") {
 			continue
 		}
-		out = append(out, v)
+		out = append(out, v.(string))
 	}
 	return out
 }
@@ -102,10 +103,10 @@ func (p *Params) Values() []string {
 func (p *Params) RawValues() []string {
 	var out []string = make([]string, 0)
 	for _, v := range p.Fields {
-		if !strings.HasPrefix(v, "raw:") {
+		if !strings.HasPrefix(v.(string), "raw:") {
 			continue
 		}
-		out = append(out, strings.TrimPrefix(v, "raw:"))
+		out = append(out, strings.TrimPrefix(v.(string), "raw:"))
 	}
 	return out
 }
@@ -113,7 +114,7 @@ func (p *Params) RawValues() []string {
 // Set - sets a `p.Fields` property
 func (p *Params) Set(key, value string, isRaw bool) {
 	if p.Fields == nil {
-		p.Fields = make(map[string]string)
+		p.Fields = make(map[string]interface{})
 	}
 	if isRaw {
 		key = "raw:" + key
@@ -124,6 +125,12 @@ func (p *Params) Set(key, value string, isRaw bool) {
 			break
 		}
 	}
+}
+func (p *Params) SetAny(key string, value interface{}) {
+	if p.Fields == nil {
+		p.Fields = make(map[string]interface{})
+	}
+	p.Fields[key] = value
 }
 
 // Load - loads the scheme file to the specified path.
