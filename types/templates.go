@@ -40,6 +40,12 @@ func (t *Template) Load(dir string) error {
 		return err
 	}
 
+	funcs := map[string]any{
+		"contains":  strings.Contains,
+		"hasPrefix": strings.HasPrefix,
+		"hasSuffix": strings.HasSuffix}
+
+	t.Template.Funcs(funcs)
 	var err error
 	t.Template, err = t.Template.ParseFiles(paths...)
 	if err != nil {
