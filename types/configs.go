@@ -43,6 +43,7 @@ type (
 		Filter             string            `yaml:"filter"`
 		UsersSearchBase    string            `yaml:"usersSearchBase"`
 		GroupsSearchBase   string            `yaml:"groupsSearchBase"`
+		FlagsAttribute     string            `yaml:"flagsAttribute"`
 		Subgroups          bool              `yaml:"subgroups"`
 		AllowWithoutGroups bool              `yaml:"allowWithoutGroups"`
 		GroupFields        map[string]string `yaml:"groupFields"`

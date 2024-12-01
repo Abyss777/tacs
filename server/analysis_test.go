@@ -44,7 +44,7 @@ func Test(t *testing.T) {
 				scheme: types.Config{Local: &types.Local{
 					Default: types.Params{
 						Template: "default",
-						Fields:   map[string]string{"cn": "root", "mail": "root@example.com"},
+						Fields:   map[string]interface{}{"cn": "root", "mail": "root@example.com"},
 					},
 					List: map[string]types.Params{"root": {}},
 				}}, exp: exp{

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	l "log/slog"
 	"net/http"
+	"strings"
 
 	"golang.org/x/exp/maps"
 
@@ -71,7 +72,6 @@ func analysisLdap(w http.ResponseWriter, r *http.Request, username string) bool 
 	groupFilter := fmt.Sprintf("(member%s=%s)", subGroup, ldapUser[0]["dn"][0])
 	l.Debug("search for user groups in LDAP", l.String("filter", groupFilter))
 	groupFields := maps.Values(t.Scheme.Ldap.GroupFields)
-	l.Debug("", l.Any("groupFields", t.Scheme.Ldap.GroupFields))
 	userGroups, err := ld.Request(lConn, t.Scheme.Ldap.GroupsSearchBase, groupFilter, groupFields, false)
 	if err != nil || len(userGroups) == 0 {
 		if ldap.IsErrorAnyOf(err, ldap.LDAPResultNoSuchObject) || len(userGroups) == 0 {
@@ -134,6 +134,7 @@ func analysisLdap(w http.ResponseWriter, r *http.Request, username string) bool 
 		return true
 	}
 
+	flags := map[string]string{}
 	// Finding out which fields should be requested from ldap to fill the template
 	userFields := params.Values()
 	if len(userFields) != 0 {
@@ -153,8 +154,16 @@ func analysisLdap(w http.ResponseWriter, r *http.Request, username string) bool 
 				if len(v) == 0 {
 					params.Set(key, "", false)
 					continue
+				} else if len(v) == 1 {
+					params.Set(key, ldapFields[0][key][0], false)
+				} else if t.Scheme.Ldap.FlagsAttribute != "" && key == t.Scheme.Ldap.FlagsAttribute {
+					for _, e := range ldapFields[0][key] {
+						parts := strings.Split(e, "=")
+						flags[parts[0]] = parts[1]
+					}
+				} else if len(v) > 1 {
+					params.Set(key, strings.Join(ldapFields[0][key], ";"), false)
 				}
-				params.Set(key, ldapFields[0][key][0], false)
 			}
 		}
 	}
@@ -183,6 +192,8 @@ func analysisLdap(w http.ResponseWriter, r *http.Request, username string) bool 
 			}
 		}
 	}
+
+	params.SetAny("flags", flags)
 	params.SetAny("groups", groups)
 	if err := t.Templates.ExecuteTemplate(w, params.Template, params.Fields); err != nil {
 		l.Error("execute template error",
